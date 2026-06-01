@@ -186,18 +186,52 @@
 
 </div>
 <script src="assets/runtime.js"></script>
+<style>
+  /* allow active slide to scroll its own content if taller than viewport */
+  .slide.is-active{ overflow-y:auto; overflow-x:hidden; }
+</style>
 <script>
   (function () {
-    var lastAt = 0;
+    var SLIDE_DEBOUNCE_MS = 700;
+    var EDGE_TOLERANCE_PX = 2;
+    var lastSlideAt = 0;
+
+    function activeSlide() {
+      return document.querySelector('.slide.is-active');
+    }
+
     window.addEventListener('wheel', function (e) {
       if (e.ctrlKey || e.metaKey) return;
-      if (Math.abs(e.deltaY) < 10) return;
+      if (Math.abs(e.deltaY) < 4) return;
+
+      var slide = activeSlide();
+      if (!slide) return;
+
+      var canScrollDown = slide.scrollTop + slide.clientHeight < slide.scrollHeight - EDGE_TOLERANCE_PX;
+      var canScrollUp = slide.scrollTop > EDGE_TOLERANCE_PX;
+      var goingDown = e.deltaY > 0;
+
+      // If the active slide can absorb the scroll in this direction, let the browser handle it.
+      if ((goingDown && canScrollDown) || (!goingDown && canScrollUp)) {
+        return;
+      }
+
+      // At an edge — advance/retreat the deck, with debounce so a single
+      // scroll click moves exactly one slide.
       var now = Date.now();
-      if (now - lastAt < 700) return;
-      lastAt = now;
-      var key = e.deltaY > 0 ? 'ArrowRight' : 'ArrowLeft';
+      if (now - lastSlideAt < SLIDE_DEBOUNCE_MS) return;
+      lastSlideAt = now;
+      var key = goingDown ? 'ArrowRight' : 'ArrowLeft';
       document.dispatchEvent(new KeyboardEvent('keydown', { key: key, bubbles: true }));
     }, { passive: true });
+
+    // Reset scroll position whenever the active slide changes so newly-revealed
+    // slides start at the top.
+    var mo = new MutationObserver(function () {
+      var slide = activeSlide();
+      if (slide && slide.scrollTop !== 0) slide.scrollTop = 0;
+    });
+    mo.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['class'] });
   })();
 </script>
 </body>
