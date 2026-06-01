@@ -189,7 +189,129 @@
 <style>
   /* allow active slide to scroll its own content if taller than viewport */
   .slide.is-active{ overflow-y:auto; overflow-x:hidden; }
+
+  /* ===== Mobile / tablet portrait (≤ 900px) ===== */
+  @media (max-width: 900px) {
+    .tpl-xhs-pastel-card .slide { padding: 32px 20px !important; }
+    .tpl-xhs-pastel-card .xp-h1 { font-size: 44px !important; line-height: 1.15 !important; letter-spacing: -0.5px !important; }
+    .tpl-xhs-pastel-card .xp-h2 { font-size: 32px !important; line-height: 1.2 !important; }
+    .tpl-xhs-pastel-card .xp-sub { font-size: 16px !important; line-height: 1.55 !important; }
+    .tpl-xhs-pastel-card .xp-kicker { font-size: 12px !important; }
+    .tpl-xhs-pastel-card .xp-chip { font-size: 11px !important; padding: 6px 14px !important; }
+    .tpl-xhs-pastel-card .xp-card { padding: 20px 22px !important; border-radius: 20px !important; }
+    .tpl-xhs-pastel-card .xp-card .xp-num { font-size: 44px !important; }
+    .tpl-xhs-pastel-card .xp-card h4 { font-size: 16px !important; }
+    .tpl-xhs-pastel-card .xp-card p { font-size: 13px !important; line-height: 1.5 !important; }
+    .tpl-xhs-pastel-card .xp-grid-2,
+    .tpl-xhs-pastel-card .xp-grid-3 { grid-template-columns: 1fr !important; gap: 12px !important; }
+    /* override the inline grid-column:span 2 used on the last migration card */
+    .tpl-xhs-pastel-card .xp-grid-2 .xp-card[style*="span 2"] { grid-column: 1 !important; }
+    .tpl-xhs-pastel-card .xp-quote { font-size: 26px !important; line-height: 1.35 !important; }
+    .tpl-xhs-pastel-card .xp-quote::before { font-size: 60px !important; }
+    .tpl-xhs-pastel-card .xp-codebox { font-size: 12px !important; padding: 18px 16px !important; line-height: 1.7 !important; border-radius: 16px !important; }
+    .tpl-xhs-pastel-card .xp-divider { margin: 14px 0 !important; }
+    .tpl-xhs-pastel-card .xp-topbar { top: 16px !important; left: 20px !important; right: 20px !important; }
+    .tpl-xhs-pastel-card .xp-footer { left: 20px !important; right: 20px !important; bottom: 12px !important; font-size: 10px !important; }
+    .tpl-xhs-pastel-card .xp-page { font-size: 10px !important; }
+    /* shrink the ad-hoc inline overrides used on a few title slides */
+    .tpl-xhs-pastel-card .xp-h1[style*="120px"],
+    .tpl-xhs-pastel-card .xp-h1[style*="160px"],
+    .tpl-xhs-pastel-card .xp-h1[style*="104px"],
+    .tpl-xhs-pastel-card .xp-h1[style*="88px"] { font-size: 44px !important; }
+  }
+
+  /* very narrow phones */
+  @media (max-width: 420px) {
+    .tpl-xhs-pastel-card .xp-h1 { font-size: 36px !important; }
+    .tpl-xhs-pastel-card .xp-h2 { font-size: 26px !important; }
+    .tpl-xhs-pastel-card .xp-quote { font-size: 22px !important; }
+    .tpl-xhs-pastel-card .xp-codebox { font-size: 11px !important; }
+  }
 </style>
+<script>
+  (function () {
+    var SLIDE_DEBOUNCE_MS = 700;
+    var EDGE_TOLERANCE_PX = 2;
+    var lastSlideAt = 0;
+
+    function activeSlide() {
+      return document.querySelector('.slide.is-active');
+    }
+
+    function fireKey(key) {
+      var now = Date.now();
+      if (now - lastSlideAt < SLIDE_DEBOUNCE_MS) return;
+      lastSlideAt = now;
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: key, bubbles: true }));
+    }
+
+    /* ===== Wheel: scroll content first, then advance ===== */
+    window.addEventListener('wheel', function (e) {
+      if (e.ctrlKey || e.metaKey) return;
+      if (Math.abs(e.deltaY) < 4) return;
+
+      var slide = activeSlide();
+      if (!slide) return;
+
+      var canScrollDown = slide.scrollTop + slide.clientHeight < slide.scrollHeight - EDGE_TOLERANCE_PX;
+      var canScrollUp = slide.scrollTop > EDGE_TOLERANCE_PX;
+      var goingDown = e.deltaY > 0;
+
+      if ((goingDown && canScrollDown) || (!goingDown && canScrollUp)) return;
+
+      fireKey(goingDown ? 'ArrowRight' : 'ArrowLeft');
+    }, { passive: true });
+
+    /* ===== Touch swipe + touch scroll (mobile) ===== */
+    var tStartX = 0, tStartY = 0, tStartScroll = 0, tActive = false;
+    window.addEventListener('touchstart', function (e) {
+      if (e.touches.length !== 1) return;
+      tStartX = e.touches[0].clientX;
+      tStartY = e.touches[0].clientY;
+      var slide = activeSlide();
+      tStartScroll = slide ? slide.scrollTop : 0;
+      tActive = true;
+    }, { passive: true });
+
+    window.addEventListener('touchend', function (e) {
+      if (!tActive) return;
+      tActive = false;
+      var t = e.changedTouches && e.changedTouches[0];
+      if (!t) return;
+      var dx = t.clientX - tStartX;
+      var dy = t.clientY - tStartY;
+      var slide = activeSlide();
+      if (!slide) return;
+
+      var absX = Math.abs(dx), absY = Math.abs(dy);
+
+      // Horizontal swipe: navigate slides if it dominates and is long enough
+      if (absX > 60 && absX > absY * 1.4) {
+        fireKey(dx < 0 ? 'ArrowRight' : 'ArrowLeft');
+        return;
+      }
+
+      // Vertical swipe at slide edge: advance/retreat instead of bounce
+      if (absY > 80 && absY > absX * 1.4) {
+        var atTop = slide.scrollTop <= EDGE_TOLERANCE_PX;
+        var atBottom = slide.scrollTop + slide.clientHeight >= slide.scrollHeight - EDGE_TOLERANCE_PX;
+        // Swipe up (dy<0) at bottom → next; swipe down (dy>0) at top → prev
+        if (dy < 0 && atBottom && tStartScroll === slide.scrollTop) {
+          fireKey('ArrowRight');
+        } else if (dy > 0 && atTop && tStartScroll === slide.scrollTop) {
+          fireKey('ArrowLeft');
+        }
+      }
+    }, { passive: true });
+
+    /* ===== Reset slide scroll on slide change ===== */
+    var mo = new MutationObserver(function () {
+      var slide = activeSlide();
+      if (slide && slide.scrollTop !== 0) slide.scrollTop = 0;
+    });
+    mo.observe(document.body, { attributes: true, subtree: true, attributeFilter: ['class'] });
+  })();
+</script>
 <script>
   (function () {
     var SLIDE_DEBOUNCE_MS = 700;
