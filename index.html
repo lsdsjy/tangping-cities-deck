@@ -186,5 +186,19 @@
 
 </div>
 <script src="assets/runtime.js"></script>
+<script>
+  (function () {
+    var lastAt = 0;
+    window.addEventListener('wheel', function (e) {
+      if (e.ctrlKey || e.metaKey) return;
+      if (Math.abs(e.deltaY) < 10) return;
+      var now = Date.now();
+      if (now - lastAt < 700) return;
+      lastAt = now;
+      var key = e.deltaY > 0 ? 'ArrowRight' : 'ArrowLeft';
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: key, bubbles: true }));
+    }, { passive: true });
+  })();
+</script>
 </body>
 </html>
